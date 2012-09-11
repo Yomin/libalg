@@ -30,13 +30,13 @@
 struct vector
 {
     void *mem, *pos;
-    int esize, capacity, malloced, capacited;
+    int size, esize, capacity, malloced, capacited;
 };
 
 typedef int vector_finishfun(int pos, void *elem, void *state);
 typedef int vector_delfun(void *elem);
 
-int vector_init(int elemsize, struct vector *vec);
+int vector_init(int elemsize, struct vector **vec);
 int vector_finish(struct vector *vec);
 int vector_finish_custom(vector_finishfun fun, void *state, struct vector *vec);
 

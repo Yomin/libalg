@@ -32,5 +32,21 @@
 #define ALG_ERROR_INDEX_RANGE       -6
 #define ALG_ERROR_EMPTY             -7
 
+char* alg_str_error(int error)
+{
+    switch(error)
+    {
+        case ALG_SUCCESS:               return "operation successfull";
+        case ALG_ERROR_BAD_STRUCTURE:   return "bad structure";
+        case ALG_ERROR_BAD_SIZE:        return "bad size";
+        case ALG_ERROR_BAD_SOURCE:      return "bad source";
+        case ALG_ERROR_BAD_DESTINATION: return "bad destination";
+        case ALG_ERROR_NO_MEMORY:       return "unsufficient memory";
+        case ALG_ERROR_INDEX_RANGE:     return "index out of range";
+        case ALG_ERROR_EMPTY:           return "empty";
+    }
+    return "unknown error";
+}
+
 #endif
 
