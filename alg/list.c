@@ -168,7 +168,7 @@ int list_init(int elemsize, struct list **pl)
     l->first = 0;
     l->last = 0;
     l->current = 0;
-    l->status |= ALG_STATUS_MALLOCED*malloced;
+    l->status = ALG_STATUS_MALLOCED*malloced;
     
     RET(ALG_SUCCESS, l);
 }
@@ -180,32 +180,16 @@ int list_finish(struct list *l)
 
 int list_finish_custom(alg_foldfun *fun, void *state, struct list *l)
 {
-    struct list_elem *current, *next = l->first;
-    int ret, pos;
+    list_clear(l);
+    if(l->error != ALG_SUCCESS)
+        return l->error;
     
-    if(!l)
-        return ALG_ERROR_BAD_STRUCTURE;
-    
-    pos = 0;
-    while(next)
-    {
-        current = next;
-        next = current->next;
-        if(fun && (ret = fun(pos, current->elem, state)) != ALG_SUCCESS)
-            return ret;
-        free(current->elem);
-        free(current);
-        pos++;
-    }
-    
-    l->first = 0;
-    l->last = 0;
-    l->current = 0;
-    l->size = 0;
     if(l->status & ALG_STATUS_MALLOCED)
         free(l);
+    else
+        memset(l, 0, sizeof(struct list));
     
-    RET(ALG_SUCCESS, l);
+    return ALG_SUCCESS;
 }
 
 void* list_at(int pos, struct list *l)
@@ -443,8 +427,11 @@ void* list_ins_after(alg_foldfun fun, void *state, void *elem, struct list *l)
     lelem->next = felem->next;
     if(felem->next)
         felem->next->prev = lelem;
+    else
+        l->last = lelem;
     felem->next = lelem;
     lelem->prev = felem;
+    (l->size)++;
     RETI(lelem, lelem->elem, l);
 }
 
@@ -473,8 +460,11 @@ void* list_ins_before(alg_foldfun fun, void *state, void *elem, struct list *l)
     lelem->prev = felem->prev;
     if(felem->prev)
         felem->prev->next = lelem;
+    else
+        l->first = lelem;
     felem->prev = lelem;
     lelem->next = felem;
+    (l->size)++;
     RETI(lelem, lelem->elem, l);
 }
 
@@ -497,13 +487,11 @@ void list_pop_custom(void *dst, alg_mapfun fun, struct list *l)
     if(!l)
         RETV(ALG_ERROR_BAD_STRUCTURE, l);
     
-    if(!dst)
-        RETV(ALG_ERROR_BAD_DESTINATION, l);
-    
     if(!l->last)
         RETV(ALG_ERROR_EMPTY, l);
     
-    memcpy(dst, l->last->elem, l->esize);
+    if(dst)
+        memcpy(dst, l->last->elem, l->esize);
     
     if(fun)
         fun(l->last->elem);
@@ -577,12 +565,64 @@ void list_rem_custom(int pos, void *dst, alg_mapfun fun, struct list *l)
     l->error = ALG_SUCCESS;
 }
 
+void list_find_del(alg_foldfun fun, void *state, struct list *l)
+{
+    list_find_del_custom(fun, state, 0, l);
+}
+
+void list_find_del_custom(alg_foldfun ffun, void *state, alg_mapfun dfun, struct list *l)
+{
+    struct list_elem *lelem;
+    EXEC_INTERN(lelem = list_find(ffun, state, l), l);
+    CATCHV(l);
+    
+    if(lelem == l->current)
+        l->current = 0;
+    
+    if(dfun)
+        dfun(lelem->elem);
+    
+    list_intern_remove(lelem, l);
+    
+    l->error = ALG_SUCCESS;
+}
+
+void list_find_rem(alg_foldfun fun, void *state, void *dst, struct list *l)
+{
+    list_find_rem_custom(fun, state, dst, 0, l);
+}
+
+void list_find_rem_custom(alg_foldfun ffun, void *state, void *dst, alg_mapfun dfun, struct list *l)
+{
+    struct list_elem *lelem;
+    
+    if(!dst)
+        RETV(ALG_ERROR_BAD_DESTINATION, l);
+    
+    EXEC_INTERN(lelem = list_find(ffun, state, l), l);
+    CATCHV(l);
+    
+    if(lelem == l->current)
+        l->current = 0;
+    
+    memcpy(dst, lelem->elem, l->esize);
+    
+    if(dfun)
+        dfun(lelem->elem);
+    
+    list_intern_remove(lelem, l);
+    
+    l->error = ALG_SUCCESS;
+}
+
 void list_fold(alg_foldfun fun, void *state, struct list *l)
 {
     struct list_fold_state fstate;
     fstate.fun = fun;
     fstate.state = state;
     list_intern_iterate(list_intern_fold, &fstate, l);
+    if(l->error == ALG_ERROR_NOT_FOUND)
+        l->error = ALG_SUCCESS;
 }
 
 void list_clear(struct list *l)
@@ -606,13 +646,218 @@ void list_clear_custom(alg_foldfun fun, void *state, struct list *l)
         next = current->next;
         if(fun)
             fun(pos, current->elem, state);
-        free(current->elem);
         free(current);
         pos++;
     }
     l->first = 0;
     l->last = 0;
     l->current = 0;
+    l->size = 0;
     l->error = ALG_SUCCESS;
 }
+
+#ifdef ALG_TEST
+
+#include <stdio.h>
+
+void show_list(struct list *l)
+{
+    int i;
+    struct list_elem *lelem;
+    
+    printf("size: %i | ", l->size);
+
+    if(l->first)
+        printf("first: %i | ", *(int*) l->first->elem);
+    else
+        printf("first: NULL | ");
+    if(l->last)
+        printf("last: %i | ", *(int*) l->last->elem);
+    else
+        printf("last: NULL | ");
+    
+    if(l->size == 0)
+        printf("empty");
+    if(l->size > 0)
+        printf("%i", *(int*) l->first->elem);
+    if(l->size > 1)
+    {
+        lelem = l->first->next;
+        for(i=1; i<l->size; i++)
+        {
+            printf(", %i", *(int*) lelem->elem);
+            lelem = lelem->next;
+        }
+    }
+    printf("\n");
+}
+
+int catch(struct list *l)
+{
+    if(l->error != ALG_SUCCESS)
+    {
+        printf("error: %s\n", alg_str_error(l->error));
+        return 1;
+    }
+    return 0;
+}
+
+int catche(struct list *l)
+{
+    if(l->error == ALG_SUCCESS)
+    {
+        printf("success when error required\n");
+        return 1;
+    }
+    printf("correct error\n");
+    return 0;
+}
+
+int test_fun(int pos, void *elem, void *state)
+{
+    if(*(int*)elem == *(int*)state)
+        return 1;
+    return 0;
+}
+
+int test_fun2(int pos, void *elem, void *state)
+{
+    printf("%i ", *(int*)elem);
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    struct list *l = 0;
+    int i = 23, j;
+    int *elem;
+    
+    list_init(sizeof(int), &l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    list_push(&i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 42;
+    list_push(&i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    i = 1;
+    list_ins(0, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 2;
+    list_ins(l->size-1, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 3;
+    list_ins(l->size, &i, l);
+    if(catche(l))
+        return 1;
+    
+    i = 10; j = 1;
+    list_ins_after(test_fun, &j, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 20; j = 42;
+    list_ins_after(test_fun, &j, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    i = 11; j = 1;
+    list_ins_before(test_fun, &j, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 22; j = 20;
+    list_ins_before(test_fun, &j, &i, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    elem = list_at(0, l);
+    if(catch(l))
+        return 1;
+    printf("pos 0: %i\n", *elem);
+    elem = list_at(l->size-1, l);
+    if(catch(l))
+        return 1;
+    printf("pos size-1: %i\n", *elem);
+    elem = list_at(l->size, l);
+    if(catche(l))
+        return 1;
+    
+    list_get(0, &j, l);
+    if(catch(l))
+        return 1;
+    printf("pos 0: %i\n", j);
+    
+    j = 23;
+    list_find(test_fun, &j, l);
+    if(catch(l))
+        return 1;
+    printf("found\n");
+    j = 24;
+    list_find(test_fun, &j, l);
+    if(catche(l))
+        return 1;
+    
+    list_pop(0, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    list_del(0, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    list_del(l->size-1, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    list_rem(0, &j, l);
+    if(catch(l))
+        return 1;
+    printf("elem: %i | ", j);
+    show_list(l);
+    
+    j = 42;
+    list_find_del(test_fun, &j, l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    i = 0; j = 10;
+    list_find_rem(test_fun, &j, &i, l);
+    if(catch(l))
+        return 1;
+    printf("elem: %i | ", i);
+    show_list(l);
+    
+    list_fold(test_fun2, 0, l);
+    printf("\n");
+    if(catch(l))
+        return 1;
+    
+    list_clear(l);
+    if(catch(l))
+        return 1;
+    show_list(l);
+    
+    if(list_finish(l) != ALG_SUCCESS)
+        return 1;
+    
+    return 0;
+}
+
+#endif
 
