@@ -22,45 +22,48 @@
 
 #include "vector.h"
 #include "error.h"
+#include "help.h"
 #include <stdlib.h>
 #include <string.h>
 
-int vector_grow(int capacity, struct vector *vec)
+void vector_grow(int capacity, struct vector *vec)
 {
     void *tmp = realloc(vec->mem, capacity*vec->esize);
     if(!tmp)
-        return ALG_ERROR_NO_MEMORY;
+        RETV(ALG_ERROR_NO_MEMORY, vec);
     vec->mem = tmp;
     vec->pos = tmp + vec->size*vec->esize;
     vec->capacity = capacity;
     
-    return ALG_SUCCESS;
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_autogrow(struct vector *vec)
+void vector_autogrow(struct vector *vec)
 {
     if(vec->size == vec->capacity)
-        return vector_grow(vec->capacity*ALG_VECTOR_GROW, vec);
-    return ALG_SUCCESS;
+        vector_grow(vec->capacity*ALG_VECTOR_GROW, vec);
+    CATCHV(vec);
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_shrink(int capacity, struct vector *vec)
+void vector_shrink(int capacity, struct vector *vec)
 {
     void *tmp = realloc(vec->mem, capacity*vec->esize);
     if(!tmp)
-        return ALG_ERROR_NO_MEMORY;
+        RETV(ALG_ERROR_NO_MEMORY, vec);
     vec->mem = tmp;
     vec->pos = tmp + vec->size*vec->esize;
     vec->capacity = capacity;
     
-    return ALG_SUCCESS;
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_autoshrink(struct vector *vec)
+void vector_autoshrink(struct vector *vec)
 {
     if(vec->size <= vec->capacity/ALG_VECTOR_SHRINK && vec->capacity > vec->capacited)
-        return vector_shrink(vec->capacity/ALG_VECTOR_GROW, vec);
-    return ALG_SUCCESS;
+        vector_shrink(vec->capacity/ALG_VECTOR_GROW, vec);
+    CATCHV(vec);
+    vec->error = ALG_SUCCESS;
 }
 
 int vector_init(int elemsize, struct vector **vec)
@@ -86,7 +89,7 @@ int vector_init(int elemsize, struct vector **vec)
     v->size = 0;
     v->esize = elemsize;
     v->capacity = ALG_VECTOR_CAPACITY;
-    v->malloced = malloced;
+    v->status = ALG_STATUS_MALLOCED*malloced;
     v->capacited = ALG_VECTOR_CAPACITY;
     v->mem = malloc(elemsize*ALG_VECTOR_CAPACITY);
     
@@ -99,7 +102,7 @@ int vector_init(int elemsize, struct vector **vec)
     
     v->pos = v->mem;
     
-    return ALG_SUCCESS;
+    RET(ALG_SUCCESS, v);
 }
 
 int vector_finish(struct vector *vec)
@@ -113,126 +116,127 @@ int vector_finish_custom(alg_foldfun fun, void *state, struct vector *vec)
     void *ptr;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETE(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(fun)
         for(i=0, ptr=vec->mem; i<vec->size; i++, ptr += vec->esize)
             if((ret = fun(i, state, ptr)) != ALG_SUCCESS)
-                return ret;
+                RETE(ret, vec);
     
     free(vec->mem);
-    vec->mem = 0;
-    vec->size = 0;
-    if(vec->malloced)
+    if(vec->status & ALG_STATUS_MALLOCED)
         free(vec);
+    else
+        memset(vec, 0, sizeof(struct vector));
     
     return ALG_SUCCESS;
 }
 
 void* vector_at(int pos, struct vector *vec)
 {
-    if(!vec || pos < 0 || pos >= vec->size)
-        return 0;
-    
-    return vec->mem + pos*vec->esize;
-}
-
-int vector_get(int pos, void *dst, struct vector *vec)
-{
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
-    
-    if(!dst)
-        return ALG_ERROR_BAD_DESTINATION;
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(pos < 0 || pos >= vec->size)
-        return ALG_ERROR_INDEX_RANGE;
+        RETZ(ALG_ERROR_INDEX_RANGE, vec);
+    
+    RET(vec->mem + pos*vec->esize, vec);
+}
+
+void* vector_get(int pos, void *dst, struct vector *vec)
+{
+    if(!vec)
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
+    
+    if(!dst)
+        RETZ(ALG_ERROR_BAD_DESTINATION, vec);
+    
+    if(pos < 0 || pos >= vec->size)
+        RETZ(ALG_ERROR_INDEX_RANGE, vec);
     
     memcpy(dst, vec->mem+pos*vec->esize, vec->esize);
     
-    return ALG_SUCCESS;
+    RET(vec->mem+pos*vec->esize, vec);
 }
 
 int vector_size(struct vector *vec)
 {
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
     
-    return vec->size;
+    RET(vec->size, vec);
 }
 
 int vector_capacity(struct vector *vec)
 {
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
     
-    return vec->capacity;
+    RET(vec->capacity, vec);
 }
 
-int vector_push(void *elem, struct vector *vec)
+void* vector_push(void *elem, struct vector *vec)
 {
-    int ret;
-    
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(!elem)
-        return ALG_ERROR_BAD_SOURCE;
+        RETZ(ALG_ERROR_BAD_SOURCE, vec);
     
-    if((ret = vector_autogrow(vec)) != ALG_SUCCESS)
-        return ret;
+    vector_autogrow(vec);
+    CATCHZ(vec);
     
     memcpy(vec->pos, elem, vec->esize);
     vec->pos += vec->esize;
     vec->size++;
     
-    return ALG_SUCCESS;
+    RET(vec->pos-vec->esize, vec);
 }
 
-int vector_pop(void *dst, struct vector *vec)
+void vector_pop(void *dst, struct vector *vec)
 {
-    return vector_pop_custom(dst, 0, vec);
+    vector_pop_custom(dst, 0, vec);
 }
 
-int vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec)
+void vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec)
 {
     int ret;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
-    
-    if(!dst)
-        return ALG_ERROR_BAD_DESTINATION;
+        RETV(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(!vec->size)
-        return ALG_ERROR_EMPTY;
+        RETV(ALG_ERROR_EMPTY, vec);
     
     vec->pos -= vec->esize;
     vec->size--;
-    memcpy(dst, vec->pos, vec->esize);
+    if(dst)
+        memcpy(dst, vec->pos, vec->esize);
     
     if(fun && (ret = fun(vec->pos)) != ALG_SUCCESS)
-        return ret;
+        RETV(ret, vec);
     
-    return vector_autoshrink(vec);
+    vector_autoshrink(vec);
+    CATCHV(vec);
+    
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_ins(int pos, void *elem, struct vector *vec)
+void* vector_ins(int pos, void *elem, struct vector *vec)
 {
-    int ret;
     void *ptr;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETZ(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(!elem)
-        return ALG_ERROR_BAD_SOURCE;
+        RETZ(ALG_ERROR_BAD_SOURCE, vec);
     
-    if(pos < 0)
-        return ALG_ERROR_INDEX_RANGE;
+    if(pos < 0 || pos >= vec->size)
+        RETZ(ALG_ERROR_INDEX_RANGE, vec);
     
-    if((ret = vector_autogrow(vec)) != ALG_SUCCESS)
-        return ret;
+    vector_autogrow(vec);
+    CATCHZ(vec);
     
     ptr = vec->mem+pos*vec->esize;
     memmove(ptr+vec->esize, ptr, (vec->size-pos)*vec->esize);
@@ -240,34 +244,34 @@ int vector_ins(int pos, void *elem, struct vector *vec)
     vec->size++;
     memcpy(ptr, elem, vec->esize);
     
-    return ALG_SUCCESS;
+    RET(ptr, vec);
 }
 
-int vector_del(int pos, struct vector *vec)
+void vector_del(int pos, struct vector *vec)
 {
-    return vector_rem_custom(pos, 0, 0, vec);
+    vector_rem_custom(pos, 0, 0, vec);
 }
 
-int vector_del_custom(int pos, alg_mapfun fun, struct vector *vec)
+void vector_del_custom(int pos, alg_mapfun fun, struct vector *vec)
 {
-    return vector_rem_custom(pos, fun, 0, vec);
+    vector_rem_custom(pos, fun, 0, vec);
 }
 
-int vector_rem(int pos, void *dst, struct vector *vec)
+void vector_rem(int pos, void *dst, struct vector *vec)
 {
-    return vector_rem_custom(pos, dst, 0, vec);
+    vector_rem_custom(pos, dst, 0, vec);
 }
 
-int vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec)
+void vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec)
 {
     int ret;
     void *ptr;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETV(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(pos < 0 || pos >= vec->size)
-        return ALG_ERROR_INDEX_RANGE;
+        RETV(ALG_ERROR_INDEX_RANGE, vec);
     
     ptr = vec->mem+pos*vec->esize;
     
@@ -275,54 +279,60 @@ int vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec)
         memcpy(dst, ptr, vec->esize);
     
     if(fun && (ret = fun(ptr)) != ALG_SUCCESS)
-        return ret;
+        RETV(ret, vec);
     
     memmove(ptr, ptr+vec->esize, (vec->size-pos-1)*vec->esize);
     vec->pos -= vec->esize;
     vec->size--;
     
-    return vector_autoshrink(vec);
+    vector_autoshrink(vec);
+    CATCHV(vec);
+    
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_clear(struct vector *vec)
+void vector_clear(struct vector *vec)
 {
-    return vector_clear_custom(0, 0, vec);
+    vector_clear_custom(0, 0, vec);
 }
 
-int vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec)
+void vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec)
 {
     int i, ret;
     void *ptr;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETV(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(fun)
         for(i=0, ptr=vec->mem; i<vec->size; i++, ptr += vec->esize)
             if((ret = fun(i, state, ptr)) != ALG_SUCCESS)
-                return ret;
+                RETV(ret, vec);
     
     vec->pos = vec->mem;
     vec->size = 0;
     
-    return vector_autoshrink(vec);
+    vector_autoshrink(vec);
+    CATCHV(vec);
+    
+    vec->error = ALG_SUCCESS;
 }
 
-int vector_set_capacity(int capacity, struct vector *vec)
+void vector_set_capacity(int capacity, struct vector *vec)
 {
-    return vector_set_capacity_custom(capacity, 0, 0, vec);
+    vector_set_capacity_custom(capacity, 0, 0, vec);
 }
 
-int vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec)
+void vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec)
 {
-    int i, ret, count;
+    int i, count, ret;
     void *ptr;
     
     if(!vec)
-        return ALG_ERROR_BAD_STRUCTURE;
+        RETV(ALG_ERROR_BAD_STRUCTURE, vec);
     
     if(capacity <= 0)
-        return ALG_ERROR_BAD_SIZE;
+        RETV(ALG_ERROR_BAD_SIZE, vec);
     
     if(capacity < vec->capacity)
     {
@@ -335,20 +345,20 @@ int vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struc
             if(fun)
                 for(i=capacity, ptr=vec->pos; i<count; i++, ptr += vec->esize)
                     if((ret = fun(i, state, ptr)) != ALG_SUCCESS)
-                        return ret;
+                        RETV(ret, vec);
         }
-        if((ret = vector_shrink(capacity, vec)) != ALG_SUCCESS)
-            return ret;
+        vector_shrink(capacity, vec);
+        CATCHV(vec);
     }
     else if(capacity > vec->capacity)
     {
-        if((ret = vector_grow(capacity, vec)) != ALG_SUCCESS)
-            return ret;
+        vector_grow(capacity, vec);
+        CATCHV(vec);
     }
     
     vec->capacited = capacity;
     
-    return ALG_SUCCESS;
+    vec->error = ALG_SUCCESS;
 }
 
 #ifdef ALG_TEST
@@ -371,11 +381,11 @@ void show_vector(struct vector *vec)
     printf("\n");
 }
 
-int die(int ret)
+int catch(struct vector *vec)
 {
-    if(ret != ALG_SUCCESS)
+    if(vec->error != ALG_SUCCESS)
     {
-        printf("error: %s\n", alg_str_error(ret));
+        printf("error: %s\n", alg_str_error(vec->error));
         return 1;
     }
     return 0;
@@ -386,59 +396,74 @@ int main(int argc, char *argv[])
     struct vector *vec = 0;
     int i = 23, j, count;
     
-    if(die(vector_init(sizeof(int), &vec)))
+    if(vector_init(sizeof(int), &vec) != ALG_SUCCESS)
         return 1;
     show_vector(vec);
     
-    if(die(vector_push(&i, vec)))
+    vector_push(&i, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
     for(i=0; i<ALG_VECTOR_CAPACITY-1; i++)
-        if(die(vector_push(&i, vec)))
+    {
+        vector_push(&i, vec);
+        if(catch(vec))
             return 1;
+    }
     show_vector(vec);
     
-    if(die(vector_push(&i, vec)))
+    vector_push(&i, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_pop(&i, vec)))
+    vector_pop(&i, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
     count = vec->size - vec->capacity/ALG_VECTOR_SHRINK -1;
     for(i=0; i<count; i++)
-        if(die(vector_pop(&j, vec)))
+    {
+        vector_pop(&j, vec);
+        if(catch(vec))
             return 1;
+    }
     show_vector(vec);
     
-    if(die(vector_pop(&i, vec)))
+    vector_pop(&i, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
     i = 42;
-    if(die(vector_ins(0, &i, vec)))
+    vector_ins(0, &i, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_del(1, vec)))
+    vector_del(1, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_set_capacity(23, vec)))
+    vector_set_capacity(23, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_set_capacity(3, vec)))
+    vector_set_capacity(3, vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_clear(vec)))
+    vector_clear(vec);
+    if(catch(vec))
         return 1;
     show_vector(vec);
     
-    if(die(vector_finish(vec)))
+    if(vector_finish(vec) != ALG_SUCCESS)
         return 1;
     
     return 0;

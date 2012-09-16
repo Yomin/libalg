@@ -32,7 +32,8 @@
 struct vector
 {
     void *mem, *pos;
-    int size, esize, capacity, malloced, capacited;
+    int size, esize, capacity, error, capacited;
+    char status;
 };
 
 int vector_init(int elemsize, struct vector **vec);
@@ -40,22 +41,24 @@ int vector_finish(struct vector *vec);
 int vector_finish_custom(alg_foldfun fun, void *state, struct vector *vec);
 
 void* vector_at(int pos, struct vector *vec);
-int   vector_get(int pos, void *dst, struct vector *vec);
+void* vector_get(int pos, void *dst, struct vector *vec);
 int   vector_size(struct vector *vec);
 int   vector_capacity(struct vector *vec);
 
-int vector_push(void *elem, struct vector *vec);
-int vector_pop(void *dst, struct vector *vec);
-int vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec);
-int vector_ins(int pos, void *elem, struct vector *vec);
-int vector_del(int pos, struct vector *vec);
-int vector_del_custom(int pos, alg_mapfun fun, struct vector *vec);
-int vector_rem(int pos, void *dst, struct vector *vec);
-int vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec);
-int vector_clear(struct vector *vec);
-int vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec);
-int vector_set_capacity(int capacity, struct vector *vec);
-int vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec);
+void* vector_push(void *elem, struct vector *vec);
+void* vector_ins(int pos, void *elem, struct vector *vec);
+
+void vector_pop(void *dst, struct vector *vec);
+void vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec);
+void vector_del(int pos, struct vector *vec);
+void vector_del_custom(int pos, alg_mapfun fun, struct vector *vec);
+void vector_rem(int pos, void *dst, struct vector *vec);
+void vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec);
+void vector_clear(struct vector *vec);
+void vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec);
+
+void vector_set_capacity(int capacity, struct vector *vec);
+void vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec);
 
 #endif
 
