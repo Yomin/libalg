@@ -20,33 +20,11 @@
  * THE SOFTWARE.
  */
 
-#ifndef __ALG_ERRORS_H__
-#define __ALG_ERRORS_H__
+#ifndef __ALG_FUN_H__
+#define __ALG_FUN_H__
 
-#define ALG_SUCCESS                  0
-#define ALG_ERROR_BAD_STRUCTURE     -1
-#define ALG_ERROR_BAD_SIZE          -2
-#define ALG_ERROR_BAD_SOURCE        -3
-#define ALG_ERROR_BAD_DESTINATION   -4
-#define ALG_ERROR_NO_MEMORY         -5
-#define ALG_ERROR_INDEX_RANGE       -6
-#define ALG_ERROR_EMPTY             -7
-
-char* alg_str_error(int error)
-{
-    switch(error)
-    {
-        case ALG_SUCCESS:               return "operation successfull";
-        case ALG_ERROR_BAD_STRUCTURE:   return "bad structure";
-        case ALG_ERROR_BAD_SIZE:        return "bad size";
-        case ALG_ERROR_BAD_SOURCE:      return "bad source";
-        case ALG_ERROR_BAD_DESTINATION: return "bad destination";
-        case ALG_ERROR_NO_MEMORY:       return "unsufficient memory";
-        case ALG_ERROR_INDEX_RANGE:     return "index out of range";
-        case ALG_ERROR_EMPTY:           return "empty";
-    }
-    return "unknown error";
-}
+typedef int alg_foldfun(int pos, void *elem, void *state);
+typedef int alg_mapfun(void *elem);
 
 #endif
 

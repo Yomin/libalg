@@ -20,13 +20,33 @@
  * THE SOFTWARE.
  */
 
-#ifndef __ALG_H__
-#define __ALG_H__
+#ifndef __ALG_HELP_H__
+#define __ALG_HELP_H__
 
-#include "alg/error.h"
-#include "alg/fun.h"
-#include "alg/vector.h"
-#include "alg/list.h"
+#define ALG_STATUS_MALLOCED 1
+#define ALG_STATUS_INTERN   2
+
+#define RET(ret, obj)   { (obj)->error = ALG_SUCCESS; return (ret); }
+#define RETV(stat, obj) { (obj)->error = (stat); return; }
+#define RETZ(stat, obj) { (obj)->error = (stat); return 0; }
+#define CATCHV(obj)     if((obj)->error != ALG_SUCCESS) return;
+#define CATCHZ(obj)     if((obj)->error != ALG_SUCCESS) return 0;
+
+#define RETI(i, e, obj) \
+{ \
+    (obj)->error = ALG_SUCCESS; \
+    if((obj)->status & ALG_STATUS_INTERN) \
+        return (i); \
+    else \
+        return (e); \
+}
+
+#define EXEC_INTERN(f, obj) \
+{ \
+    (obj)->status |= ALG_STATUS_INTERN; \
+    (f); \
+    (obj)->status &= ~ALG_STATUS_INTERN; \
+}
 
 #endif
 

@@ -21,7 +21,7 @@
  */
 
 #include "vector.h"
-#include "errors.h"
+#include "error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -107,7 +107,7 @@ int vector_finish(struct vector *vec)
     return vector_finish_custom(0, 0, vec);
 }
 
-int vector_finish_custom(vector_finishfun fun, void *state, struct vector *vec)
+int vector_finish_custom(alg_foldfun fun, void *state, struct vector *vec)
 {
     int i, ret;
     void *ptr;
@@ -121,6 +121,8 @@ int vector_finish_custom(vector_finishfun fun, void *state, struct vector *vec)
                 return ret;
     
     free(vec->mem);
+    vec->mem = 0;
+    vec->size = 0;
     if(vec->malloced)
         free(vec);
     
@@ -133,6 +135,22 @@ void* vector_at(int pos, struct vector *vec)
         return 0;
     
     return vec->mem + pos*vec->esize;
+}
+
+int vector_get(int pos, void *dst, struct vector *vec)
+{
+    if(!vec)
+        return ALG_ERROR_BAD_STRUCTURE;
+    
+    if(!dst)
+        return ALG_ERROR_BAD_DESTINATION;
+    
+    if(pos < 0 || pos >= vec->size)
+        return ALG_ERROR_INDEX_RANGE;
+    
+    memcpy(dst, vec->mem+pos*vec->esize, vec->esize);
+    
+    return ALG_SUCCESS;
 }
 
 int vector_size(struct vector *vec)
@@ -176,7 +194,7 @@ int vector_pop(void *dst, struct vector *vec)
     return vector_pop_custom(dst, 0, vec);
 }
 
-int vector_pop_custom(void *dst, vector_delfun fun, struct vector *vec)
+int vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec)
 {
     int ret;
     
@@ -230,17 +248,17 @@ int vector_del(int pos, struct vector *vec)
     return vector_rem_custom(pos, 0, 0, vec);
 }
 
-int vector_del_custom(int pos, vector_delfun fun, struct vector *vec)
+int vector_del_custom(int pos, alg_mapfun fun, struct vector *vec)
 {
     return vector_rem_custom(pos, fun, 0, vec);
 }
 
-int vector_rem(int pos, void *elem, struct vector *vec)
+int vector_rem(int pos, void *dst, struct vector *vec)
 {
-    return vector_rem_custom(pos, elem, 0, vec);
+    return vector_rem_custom(pos, dst, 0, vec);
 }
 
-int vector_rem_custom(int pos, void *elem, vector_delfun fun, struct vector *vec)
+int vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec)
 {
     int ret;
     void *ptr;
@@ -253,8 +271,8 @@ int vector_rem_custom(int pos, void *elem, vector_delfun fun, struct vector *vec
     
     ptr = vec->mem+pos*vec->esize;
     
-    if(elem)
-        memcpy(elem, ptr, vec->esize);
+    if(dst)
+        memcpy(dst, ptr, vec->esize);
     
     if(fun && (ret = fun(ptr)) != ALG_SUCCESS)
         return ret;
@@ -271,7 +289,7 @@ int vector_clear(struct vector *vec)
     return vector_clear_custom(0, 0, vec);
 }
 
-int vector_clear_custom(vector_finishfun fun, void *state, struct vector *vec)
+int vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec)
 {
     int i, ret;
     void *ptr;
@@ -295,7 +313,7 @@ int vector_set_capacity(int capacity, struct vector *vec)
     return vector_set_capacity_custom(capacity, 0, 0, vec);
 }
 
-int vector_set_capacity_custom(int capacity, vector_finishfun fun, void *state, struct vector *vec)
+int vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec)
 {
     int i, ret, count;
     void *ptr;

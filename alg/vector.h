@@ -23,6 +23,8 @@
 #ifndef __ALG_VECTOR_H__
 #define __ALG_VECTOR_H__
 
+#include "fun.h"
+
 #define ALG_VECTOR_CAPACITY 10
 #define ALG_VECTOR_GROW     2   // factor to grow or shrink
 #define ALG_VECTOR_SHRINK   3   // shrink threshold (capacity/size)
@@ -33,29 +35,27 @@ struct vector
     int size, esize, capacity, malloced, capacited;
 };
 
-typedef int vector_finishfun(int pos, void *elem, void *state);
-typedef int vector_delfun(void *elem);
-
 int vector_init(int elemsize, struct vector **vec);
 int vector_finish(struct vector *vec);
-int vector_finish_custom(vector_finishfun fun, void *state, struct vector *vec);
+int vector_finish_custom(alg_foldfun fun, void *state, struct vector *vec);
 
 void* vector_at(int pos, struct vector *vec);
+int   vector_get(int pos, void *dst, struct vector *vec);
 int   vector_size(struct vector *vec);
 int   vector_capacity(struct vector *vec);
 
 int vector_push(void *elem, struct vector *vec);
 int vector_pop(void *dst, struct vector *vec);
-int vector_pop_custom(void *dst, vector_delfun fun, struct vector *vec);
+int vector_pop_custom(void *dst, alg_mapfun fun, struct vector *vec);
 int vector_ins(int pos, void *elem, struct vector *vec);
 int vector_del(int pos, struct vector *vec);
-int vector_del_custom(int pos, vector_delfun fun, struct vector *vec);
-int vector_rem(int pos, void *elem, struct vector *vec);
-int vector_rem_custom(int pos, void *elem, vector_delfun fun, struct vector *vec);
+int vector_del_custom(int pos, alg_mapfun fun, struct vector *vec);
+int vector_rem(int pos, void *dst, struct vector *vec);
+int vector_rem_custom(int pos, void *dst, alg_mapfun fun, struct vector *vec);
 int vector_clear(struct vector *vec);
-int vector_clear_custom(vector_finishfun fun, void *state, struct vector *vec);
+int vector_clear_custom(alg_foldfun fun, void *state, struct vector *vec);
 int vector_set_capacity(int capacity, struct vector *vec);
-int vector_set_capacity_custom(int capacity, vector_finishfun fun, void *state, struct vector *vec);
+int vector_set_capacity_custom(int capacity, alg_foldfun fun, void *state, struct vector *vec);
 
 #endif
 
