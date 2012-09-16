@@ -27,10 +27,12 @@
 #define ALG_STATUS_INTERN   2
 
 #define RET(ret, obj)   { (obj)->error = ALG_SUCCESS; return (ret); }
-#define RETV(stat, obj) { (obj)->error = (stat); return; }
-#define RETZ(stat, obj) { (obj)->error = (stat); return 0; }
+#define RETV(err, obj)  { (obj)->error = (err); return; }
+#define RETZ(err, obj)  { (obj)->error = (err); return 0; }
+#define RETE(err, obj)  { (obj)->error = (err); return (err); }
 #define CATCHV(obj)     if((obj)->error != ALG_SUCCESS) return;
 #define CATCHZ(obj)     if((obj)->error != ALG_SUCCESS) return 0;
+#define CATCHE(obj)     if((obj)->error != ALG_SUCCESS) return (obj)->error;
 
 #define RETI(i, e, obj) \
 { \

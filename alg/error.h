@@ -34,6 +34,11 @@
 #define ALG_ERROR_NOT_FOUND         -8
 #define ALG_ERROR_UNSET             -9
 
+#define alg_error(obj) \
+{ \
+    return (obj)->error; \
+}
+
 char* alg_str_error(int error)
 {
     switch(error)

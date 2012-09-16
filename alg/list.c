@@ -181,8 +181,7 @@ int list_finish(struct list *l)
 int list_finish_custom(alg_foldfun *fun, void *state, struct list *l)
 {
     list_clear(l);
-    if(l->error != ALG_SUCCESS)
-        return l->error;
+    CATCHE(l);
     
     if(l->status & ALG_STATUS_MALLOCED)
         free(l);
@@ -732,8 +731,7 @@ int main(int argc, char *argv[])
     int i = 23, j;
     int *elem;
     
-    list_init(sizeof(int), &l);
-    if(catch(l))
+    if(list_init(sizeof(int), &l) != ALG_SUCCESS)
         return 1;
     show_list(l);
     
